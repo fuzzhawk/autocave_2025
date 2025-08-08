@@ -2839,5 +2839,44 @@ pkup.pkup = grid[Math.round((guy.x + 5) / 10)][Math.round((guy.y + 5) / 10)+1].p
 
 //onTimerTick();
 
-setInterval(onTimerTick, 99); 
+// Modern game loop with fixed timestep and separated update/render
+let lastTime = 0;
+const TARGET_FPS = 60;
+const FRAME_TIME = 1000 / TARGET_FPS; // 16.67ms for 60 FPS
+let accumulator = 0;
+
+function update() {
+    // Game logic update - call the original onTimerTick for now
+    // This will be gradually refactored to separate logic from rendering
+    onTimerTick();
+}
+
+function render() {
+    // Rendering logic - currently handled within onTimerTick
+    // As we extract rendering code, it will be moved here
+}
+
+function gameLoop(currentTime) {
+    const deltaTime = currentTime - lastTime;
+    lastTime = currentTime;
+    
+    // Accumulate time for fixed timestep
+    accumulator += deltaTime;
+    
+    // Update game logic at fixed 60 FPS
+    while (accumulator >= FRAME_TIME) {
+        update();
+        accumulator -= FRAME_TIME;
+    }
+    
+    // Render at display refresh rate
+    render();
+    
+    // Continue the loop
+    requestAnimationFrame(gameLoop);
+}
+
+// Start the modern game loop
+// setInterval(onTimerTick, 99); // Old loop - commented out
+requestAnimationFrame(gameLoop); 
 
