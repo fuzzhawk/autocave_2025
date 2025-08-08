@@ -983,14 +983,14 @@ bullet_g.src = 'bullets.png';
 
 
 creature_g = new Image();
-creature_g.src = 'spider.png';
+creature_g.src = 'creature1.png';
 
 
 creature1_g = new Image();
 creature1_g.src = 'creature1.png';
 
 var floor_g = new Image();
-floor_g.src = "floor.png";
+floor_g.src = "floortiles1.png";
 
 var bg = new Image();
 bg.src = "background1.jpg";
@@ -1270,6 +1270,9 @@ dev = 0;
     grid = find_pattern(grid, 10, 10, grid.length - 10, grid[0].length - 10, pattern3, 4, 0)
     grid = find_pattern(grid, 10, 10, grid.length - 10, grid[0].length - 10, pattern4, 5, 0)
     grid = find_pattern(grid, 10, 10, grid.length - 10, grid[0].length - 10, pattern5, 6, 0)
+    
+    // Generate dungeon door entrances scattered throughout the map
+    grid = find_pattern(grid, 10, 10, grid.length - 10, grid[0].length - 10, door_pattern, 3, 0)
 
 
 
