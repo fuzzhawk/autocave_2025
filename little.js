@@ -1528,6 +1528,9 @@ ctx.save();
 var zoom = 1;
 
 guy.sword = 1;
+// Original onTimerTick function - now called by the modern update() function
+// This function contains the original game logic and rendering mixed together
+// Future refactoring will gradually separate these concerns into update() and render() functions
 function onTimerTick() {
 
 //requestAnimationFrame(onTimerTick);
@@ -2846,14 +2849,27 @@ const FRAME_TIME = 1000 / TARGET_FPS; // 16.67ms for 60 FPS
 let accumulator = 0;
 
 function update() {
-    // Game logic update - call the original onTimerTick for now
-    // This will be gradually refactored to separate logic from rendering
+    // For now, keep using the original onTimerTick to ensure functionality
+    // We'll gradually extract logic in future iterations
     onTimerTick();
 }
 
 function render() {
-    // Rendering logic - currently handled within onTimerTick
-    // As we extract rendering code, it will be moved here
+    // Rendering is currently handled within onTimerTick
+    // This function is ready for when we extract rendering logic
+}
+
+// Placeholder functions for future full separation of update/render logic
+// For now, the game uses the original onTimerTick function to maintain compatibility
+
+// TODO: Future implementation will move game logic here
+function updateGameLogic() {
+    // Game state updates, entity AI, physics, collision detection, etc.
+}
+
+// TODO: Future implementation will move rendering here  
+function renderGameContent() {
+    // Terrain rendering, entity sprites, particles, UI, etc.
 }
 
 function gameLoop(currentTime) {
