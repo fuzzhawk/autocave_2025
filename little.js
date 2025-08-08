@@ -545,6 +545,12 @@ function updatemap() {
                 if (grid[x][y].on == 1) {
                     map_ctx.drawImage(floor_g, 0, grid[x][y].tileset * 10, 10, 10, x, y, 1, 1);
                 }
+                
+                // Render doors as solid black squares
+                if (grid[x][y].image == 3) {
+                    map_ctx.fillStyle = "black";
+                    map_ctx.fillRect(x, y, 1, 1);
+                }
 
 
 
@@ -620,6 +626,45 @@ function find_pattern(grid, startx, starty, endx, endy, pattern, image, spawn) {
     }
     return grid
 
+}
+
+function isInDungeon(player_x, player_y) {
+    var guy_gx = Math.round(player_x / 10);
+    var guy_gy = Math.round(player_y / 10);
+    var dungeon_radius = 20; // Check within 20 grid units of a door
+    
+    for (var dx = -dungeon_radius; dx <= dungeon_radius; dx++) {
+        for (var dy = -dungeon_radius; dy <= dungeon_radius; dy++) {
+            var check_x = guy_gx + dx;
+            var check_y = guy_gy + dy;
+            
+            if (check_x >= 0 && check_x < grid.length && check_y >= 0 && check_y < grid[0].length) {
+                if (grid[check_x][check_y].image == 3) { // Door found nearby
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+function getDungeonTileset(x, y, original_tileset) {
+    // Check if this position is near a door (within dungeon area)
+    var dungeon_radius = 20;
+    
+    for (var dx = -dungeon_radius; dx <= dungeon_radius; dx++) {
+        for (var dy = -dungeon_radius; dy <= dungeon_radius; dy++) {
+            var check_x = x + dx;
+            var check_y = y + dy;
+            
+            if (check_x >= 0 && check_x < grid.length && check_y >= 0 && check_y < grid[0].length) {
+                if (grid[check_x][check_y].image == 3) { // Door found nearby
+                    return 2; // Use middle tileset (corresponds to middle of main map texture set)
+                }
+            }
+        }
+    }
+    return original_tileset; // Use original tileset if not in dungeon
 }
 
 
@@ -1632,8 +1677,14 @@ gun_sound.play();
         //floorgrid = automata(floorgrid, "tiles", guy_gx - 10, guy_gy - 10, guy_gx + 10, guy_gy + 10)
 
         //grid = find_pattern(grid, guy_gx - 10, guy_gy - 10, guy_gx + 10, guy_gy + 10, test_pattern, 1, 1+(lineDistance(x,y, 500, 500)/50))
-        //grid = find_pattern(grid, guy_gx - 10, guy_gy - 10, guy_gx + 10, guy_gy + 10, door_pattern, 3, 3)
-       grid = find_pattern(grid, guy_gx - 10, guy_gy - 10, guy_gx + 10, guy_gy + 10, small_pattern, 2, 1 + (lineDistance(x, y, 500, 500) / 50))
+        grid = find_pattern(grid, guy_gx - 10, guy_gy - 10, guy_gx + 10, guy_gy + 10, door_pattern, 3, 0)
+       // Only spawn enemies if not in a dungeon
+       if (!isInDungeon(guy.x, guy.y)) {
+           grid = find_pattern(grid, guy_gx - 10, guy_gy - 10, guy_gx + 10, guy_gy + 10, small_pattern, 2, 1 + (lineDistance(x, y, 500, 500) / 50))
+       } else {
+           // In dungeon - just place pattern without spawning enemies
+           grid = find_pattern(grid, guy_gx - 10, guy_gy - 10, guy_gx + 10, guy_gy + 10, small_pattern, 2, 0)
+       }
 
     }
     //grid = gravity(grid);
@@ -1768,46 +1819,46 @@ if (light.noise > 0) { ln = (rand(0, light.noise) / 100) } else { ln = 0; }
 
                         //ctx.putImageData(left_slope,p_x*10,p_y*10);
 
-                        ctx.drawImage(floortiles, 10, floorgrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10, 10, 10);
+                        ctx.drawImage(floortiles, 10, getDungeonTileset(x, y, floorgrid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10, 10, 10);
 
 
                     } else if (floorgrid[x - 1][y].on == 1 && floorgrid[x][y + 1].on == 1 && floorgrid[x + 1][y - 1].on == 0 && floorgrid[x + 1][y].on == 0 && floorgrid[x][y - 1].on == 0) {
 
                         //ctx.putImageData(right_slope,p_x*10,p_y*10);
 
-                        ctx.drawImage(floortiles, 20, floorgrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10, 10, 10);
+                        ctx.drawImage(floortiles, 20, getDungeonTileset(x, y, floorgrid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10, 10, 10);
 
 
                     } else if (floorgrid[x + 1][y].on == 1 && floorgrid[x][y - 1].on == 1 && floorgrid[x - 1][y + 1].on == 0 && floorgrid[x - 1][y].on == 0 && floorgrid[x][y + 1].on == 0) {
 
                         //ctx.putImageData(left_hang,p_x*10,p_y*10);
 
-                        ctx.drawImage(floortiles, 40, floorgrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10, 10, 10);
+                        ctx.drawImage(floortiles, 40, getDungeonTileset(x, y, floorgrid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10, 10, 10);
 
 
                     } else if (floorgrid[x - 1][y].on == 1 && floorgrid[x][y - 1].on == 1 && floorgrid[x + 1][y + 1].on == 0 && floorgrid[x + 1][y].on == 0 && floorgrid[x][y + 1].on == 0) {
 
                         //ctx.putImageData(right_hang,p_x*10,p_y*10);
-                        ctx.drawImage(floortiles, 50, floorgrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10, 10, 10);
+                        ctx.drawImage(floortiles, 50, getDungeonTileset(x, y, floorgrid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10, 10, 10);
 
 
                     } else if (floorgrid[x][y - 1].on == 0) {
 
                         //ctx.putImageData(right_hang,p_x*10,p_y*10);
-                        ctx.drawImage(floortiles, 30, floorgrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10, 10, 10);
+                        ctx.drawImage(floortiles, 30, getDungeonTileset(x, y, floorgrid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10, 10, 10);
 
                     } else if (floorgrid[x][y + 1].on == 0) {
 
                         //ctx.putImageData(right_hang,p_x*10,p_y*10);
-                        ctx.drawImage(floortiles, 60, floorgrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10, 10, 10);
+                        ctx.drawImage(floortiles, 60, getDungeonTileset(x, y, floorgrid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10, 10, 10);
 
 
                     } else {
                         if (floorgrid[x][y].color == 0) {
-                            ctx.drawImage(floortiles, 0, floorgrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10, 10, 10);
+                            ctx.drawImage(floortiles, 0, getDungeonTileset(x, y, floorgrid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10, 10, 10);
 
                         } else {
-                            ctx.drawImage(floortiles, 70, floorgrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10, 10, 10);
+                            ctx.drawImage(floortiles, 70, getDungeonTileset(x, y, floorgrid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10, 10, 10);
 
 
                         }
@@ -1816,7 +1867,7 @@ if (light.noise > 0) { ln = (rand(0, light.noise) / 100) } else { ln = 0; }
 
 
                 } else {
-                    ctx.drawImage(floortiles, 70, floorgrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10, 10, 10);
+                    ctx.drawImage(floortiles, 70, getDungeonTileset(x, y, floorgrid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10, 10, 10);
 
 
                 }
@@ -1844,20 +1895,20 @@ if (light.noise > 0) { ln = (rand(0, light.noise) / 100) } else { ln = 0; }
 
                         //ctx.putImageData(left_slope,p_x*10,p_y*10);
 
-                        ctx.drawImage(tiles, 10, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+                        ctx.drawImage(tiles, 10, getDungeonTileset(x, y, grid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
 
                     } else if (grid[x - 1][y].on == 1 && grid[x][y + 1].on == 1 && grid[x + 1][y - 1].on == 0 && grid[x + 1][y].on == 0 && grid[x][y - 1].on == 0) {
 
                         //ctx.putImageData(right_slope,p_x*10,p_y*10);
 
-                        ctx.drawImage(tiles, 20, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+                        ctx.drawImage(tiles, 20, getDungeonTileset(x, y, grid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
 
                     } else if (grid[x + 1][y].on == 1 && grid[x][y - 1].on == 1 && grid[x - 1][y + 1].on == 0 && grid[x - 1][y].on == 0 && grid[x][y + 1].on == 0) {
 
                         //ctx.putImageData(left_hang,p_x*10,p_y*10);
-                        ctx.drawImage(tiles, 40, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+                        ctx.drawImage(tiles, 40, getDungeonTileset(x, y, grid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
 
                             if (grid[x][y].cliff == 3) {   ctx.drawImage(cliffs_g, 0, 0, 10, 120, p_x * 10, (p_y-11) * 10, 10, 120);}
@@ -1866,7 +1917,7 @@ if (light.noise > 0) { ln = (rand(0, light.noise) / 100) } else { ln = 0; }
                     } else if (grid[x - 1][y].on == 1 && grid[x][y - 1].on == 1 && grid[x + 1][y + 1].on == 0 && grid[x + 1][y].on == 0 && grid[x][y + 1].on == 0) {
 
                         //ctx.putImageData(right_hang,p_x*10,p_y*10);
-                        ctx.drawImage(tiles, 50, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+                        ctx.drawImage(tiles, 50, getDungeonTileset(x, y, grid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
 
                                   if (grid[x][y].cliff == 3) {   ctx.drawImage(cliffs_g, 10, 0, 10, 120, p_x * 10, (p_y-11) * 10, 10, 120);}
@@ -1874,12 +1925,12 @@ if (light.noise > 0) { ln = (rand(0, light.noise) / 100) } else { ln = 0; }
 
 	         } else if( grid[x-1][y].on == 0 && grid[x+1][y].on == 0  && grid[x][y-1].on == 0 && grid[x][y+1].on == 1) { 
 
-     			 ctx.drawImage(tiles, 70, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+     			 ctx.drawImage(tiles, 70, getDungeonTileset(x, y, grid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
 
 	         } else if( grid[x-1][y].on == 0 && grid[x+1][y].on == 0  && grid[x][y-1].on == 1 && grid[x][y+1].on == 0) { 
 
-     			 ctx.drawImage(tiles, 80, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+     			 ctx.drawImage(tiles, 80, getDungeonTileset(x, y, grid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
   if (grid[x][y].cliff == 3) {   ctx.drawImage(cliffs_g, 30, 0, 10, 120, p_x * 10, (p_y-11) * 10, 10, 120);}
 
@@ -1888,45 +1939,45 @@ if (light.noise > 0) { ln = (rand(0, light.noise) / 100) } else { ln = 0; }
 
        		  } else if( grid[x-1][y].on == 0 && grid[x+1][y].on == 1  && grid[x][y-1].on == 0 && grid[x][y+1].on == 0) {
  
-     			 ctx.drawImage(tiles, 90, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+     			 ctx.drawImage(tiles, 90, getDungeonTileset(x, y, grid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
 
     		 } else if( grid[x-1][y].on == 1 && grid[x+1][y].on == 0  && grid[x][y-1].on == 0 && grid[x][y+1].on == 0) { 
 
-     			 ctx.drawImage(tiles, 100, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+     			 ctx.drawImage(tiles, 100, getDungeonTileset(x, y, grid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
    		 } else if( grid[x-1][y].on == 0 && grid[x+1][y].on == 1) { 
 
-     			 ctx.drawImage(tiles, 110, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+     			 ctx.drawImage(tiles, 110, getDungeonTileset(x, y, grid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 	
  		} else if( grid[x-1][y].on == 1 && grid[x+1][y].on == 0) { 
 
-     			 ctx.drawImage(tiles, 120, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+     			 ctx.drawImage(tiles, 120, getDungeonTileset(x, y, grid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
  		} else if( grid[x-1][y].on == 0 && grid[x+1][y].on == 0  &&  grid[x][y-1].on == 1 &&  grid[x][y+1].on == 1  ) { 
 
-     			 ctx.drawImage(tiles, 130, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+     			 ctx.drawImage(tiles, 130, getDungeonTileset(x, y, grid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
  		} else if( grid[x-1][y].on == 1 && grid[x+1][y].on == 1  &&  grid[x][y-1].on == 0 &&  grid[x][y+1].on == 0  ) { 
 
-     			 ctx.drawImage(tiles, 140, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+     			 ctx.drawImage(tiles, 140, getDungeonTileset(x, y, grid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
 
  		} else if( grid[x-1][y].on == 0 && grid[x+1][y].on == 0  &&  grid[x][y-1].on == 0 &&  grid[x][y+1].on == 0  ) { 
 
-     			 ctx.drawImage(tiles, 150, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+     			 ctx.drawImage(tiles, 150, getDungeonTileset(x, y, grid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
 
 
                     } else if (grid[x][y - 1].on == 0) {
 
                         //ctx.putImageData(right_hang,p_x*10,p_y*10);
-                        ctx.drawImage(tiles, 30, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+                        ctx.drawImage(tiles, 30, getDungeonTileset(x, y, grid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
                     } else if (grid[x][y + 1].on == 0) {
 
                     
-                        ctx.drawImage(tiles, 60, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+                        ctx.drawImage(tiles, 60, getDungeonTileset(x, y, grid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
                            if (grid[x][y].cliff == 3) {  ctx.drawImage(cliffs_g, 20, 0, 10, 120, p_x * 10, (p_y-11) * 10, 10, 120); }
 
@@ -1935,10 +1986,10 @@ if (light.noise > 0) { ln = (rand(0, light.noise) / 100) } else { ln = 0; }
 
                     } else {
                         if (grid[x][y].color == 0) {
-                            ctx.drawImage(tiles, 0, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+                            ctx.drawImage(tiles, 0, getDungeonTileset(x, y, grid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
                         } else {
-                            ctx.drawImage(tiles, 70, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+                            ctx.drawImage(tiles, 70, getDungeonTileset(x, y, grid[x][y].tileset) * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
 
                         }
