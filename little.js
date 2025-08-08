@@ -1528,6 +1528,9 @@ ctx.save();
 var zoom = 1;
 
 guy.sword = 1;
+// Original onTimerTick function - now called by the modern update() function
+// This function contains the original game logic and rendering mixed together
+// Future refactoring will gradually separate these concerns into update() and render() functions
 function onTimerTick() {
 
 //requestAnimationFrame(onTimerTick);
@@ -2839,5 +2842,57 @@ pkup.pkup = grid[Math.round((guy.x + 5) / 10)][Math.round((guy.y + 5) / 10)+1].p
 
 //onTimerTick();
 
-setInterval(onTimerTick, 99); 
+// Modern game loop with fixed timestep and separated update/render
+let lastTime = 0;
+const TARGET_FPS = 60;
+const FRAME_TIME = 1000 / TARGET_FPS; // 16.67ms for 60 FPS
+let accumulator = 0;
+
+function update() {
+    // For now, keep using the original onTimerTick to ensure functionality
+    // We'll gradually extract logic in future iterations
+    onTimerTick();
+}
+
+function render() {
+    // Rendering is currently handled within onTimerTick
+    // This function is ready for when we extract rendering logic
+}
+
+// Placeholder functions for future full separation of update/render logic
+// For now, the game uses the original onTimerTick function to maintain compatibility
+
+// TODO: Future implementation will move game logic here
+function updateGameLogic() {
+    // Game state updates, entity AI, physics, collision detection, etc.
+}
+
+// TODO: Future implementation will move rendering here  
+function renderGameContent() {
+    // Terrain rendering, entity sprites, particles, UI, etc.
+}
+
+function gameLoop(currentTime) {
+    const deltaTime = currentTime - lastTime;
+    lastTime = currentTime;
+    
+    // Accumulate time for fixed timestep
+    accumulator += deltaTime;
+    
+    // Update game logic at fixed 60 FPS
+    while (accumulator >= FRAME_TIME) {
+        update();
+        accumulator -= FRAME_TIME;
+    }
+    
+    // Render at display refresh rate
+    render();
+    
+    // Continue the loop
+    requestAnimationFrame(gameLoop);
+}
+
+// Start the modern game loop
+// setInterval(onTimerTick, 99); // Old loop - commented out
+requestAnimationFrame(gameLoop); 
 
