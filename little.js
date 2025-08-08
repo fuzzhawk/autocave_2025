@@ -534,16 +534,17 @@ function quad_pathfind(grid, ent, size) {
 
 function updatemap() {
     map_ctx.clearRect(0, 0, 1000, 1000);
+    
+    var currentGrid = getCurrentGrid();
+    for (x = 1; x < currentGrid.length; x++) {
+        for (y = 1; y < currentGrid[0].length; y++) {
+            if (x > 2 && x < currentGrid.length - 2 && y > 2 && y < currentGrid.length - 2) {
 
-    for (x = 1; x < grid.length; x++) {
-        for (y = 1; y < grid[0].length; y++) {
-            if (x > 2 && x < grid.length - 2 && y > 2 && y < grid.length - 2) {
 
 
 
-
-                if (grid[x][y].on == 1) {
-                    map_ctx.drawImage(floor_g, 0, grid[x][y].tileset * 10, 10, 10, x, y, 1, 1);
+                if (currentGrid[x][y].on == 1) {
+                    map_ctx.drawImage(floor_g, 0, currentGrid[x][y].tileset * 10, 10, 10, x, y, 1, 1);
                 }
 
 
@@ -609,7 +610,7 @@ function find_pattern(grid, startx, starty, endx, endy, pattern, image, spawn) {
                 }
             } else {
 
-                //grid[x][y].color = 0
+                //currentGrid[x][y].color = 0
 
             }
 
@@ -1340,6 +1341,104 @@ console.log(dev);
 
 
 
+function generateDungeon(dungeonId, size) {
+    // Create a new dungeon grid
+    var dungeonGrid = new Array();
+    
+    // Initialize dungeon grid similar to main grid
+    for (x = 0; x < size; x++) {
+        dungeonGrid[x] = new Array();
+        for (y = 0; y < size; y++) {
+            dungeonGrid[x][y] = new Object();
+            dungeonGrid[x][y].color = 0;
+            dungeonGrid[x][y].f = rand(1, 50);
+            dungeonGrid[x][y].tileset = 0;
+            dungeonGrid[x][y].image = 0;
+            dungeonGrid[x][y].imagex = 0;
+            dungeonGrid[x][y].imagey = 0;
+            dungeonGrid[x][y].cliff = 0;
+            dungeonGrid[x][y].alphaoverride = 0;
+            dungeonGrid[x][y].pickup = 0;
+            dungeonGrid[x][y].on = 1; // Start with solid walls everywhere
+        }
+    }
+    
+    // Generate 3-6 rectangular rooms
+    var numRooms = rand(3, 7);
+    var rooms = [];
+    
+    for (var i = 0; i < numRooms; i++) {
+        var roomWidth = rand(8, 15);
+        var roomHeight = rand(6, 12);
+        var roomX = rand(5, size - roomWidth - 5);
+        var roomY = rand(5, size - roomHeight - 5);
+        
+        // Store room info for corridor generation
+        rooms.push({
+            x: roomX,
+            y: roomY,
+            width: roomWidth,
+            height: roomHeight,
+            centerX: roomX + Math.floor(roomWidth / 2),
+            centerY: roomY + Math.floor(roomHeight / 2)
+        });
+        
+        // Carve out the room
+        for (var rx = roomX; rx < roomX + roomWidth; rx++) {
+            for (var ry = roomY; ry < roomY + roomHeight; ry++) {
+                dungeonGrid[rx][ry].on = 0;
+            }
+        }
+    }
+    
+    // Connect rooms with corridors
+    for (var i = 0; i < rooms.length - 1; i++) {
+        var room1 = rooms[i];
+        var room2 = rooms[i + 1];
+        
+        // Create L-shaped corridor between rooms
+        var startX = room1.centerX;
+        var startY = room1.centerY;
+        var endX = room2.centerX;
+        var endY = room2.centerY;
+        
+        // Horizontal corridor first
+        var minX = Math.min(startX, endX);
+        var maxX = Math.max(startX, endX);
+        for (var cx = minX; cx <= maxX; cx++) {
+            dungeonGrid[cx][startY].on = 0;
+            if (startY > 0) dungeonGrid[cx][startY - 1].on = 0; // Make corridors wider
+            if (startY < size - 1) dungeonGrid[cx][startY + 1].on = 0;
+        }
+        
+        // Vertical corridor
+        var minY = Math.min(startY, endY);
+        var maxY = Math.max(startY, endY);
+        for (var cy = minY; cy <= maxY; cy++) {
+            dungeonGrid[endX][cy].on = 0;
+            if (endX > 0) dungeonGrid[endX - 1][cy].on = 0; // Make corridors wider
+            if (endX < size - 1) dungeonGrid[endX + 1][cy].on = 0;
+        }
+    }
+    
+    // Add entrance at first room center
+    if (rooms.length > 0) {
+        dungeonGrid[rooms[0].centerX][rooms[0].centerY].image = 4; // Entrance marker
+    }
+    
+    // Add exit at last room center  
+    if (rooms.length > 0) {
+        var lastRoom = rooms[rooms.length - 1];
+        dungeonGrid[lastRoom.centerX][lastRoom.centerY].image = 5; // Exit marker
+    }
+    
+    // Apply cellular automata for organic feel (lighter application)
+    dungeonGrid = automata(dungeonGrid, "cave", 2, 2, size - 2, size - 2);
+    
+    return dungeonGrid;
+}
+
+
 function rand(min, max) {
     var dif = max - min;
     return (Math.floor((Math.random() * dif)) + min);
@@ -1347,6 +1446,11 @@ function rand(min, max) {
 
 
 var grid = new Array();
+
+// Dungeon system data structures
+var dungeons = new Array();
+var currentLocation = { type: "overworld", id: 0 }; // type can be "overworld" or "dungeon"
+var dungeonExitPositions = new Array(); // Store where player exits back to overworld
 
 var towns = new Array();
 
@@ -1429,6 +1533,63 @@ for (t = 0; t < towns.length; t++) {
     floorgrid = automata(floorgrid, "tiles", towns[t].x - (towns[t].radius), towns[t].y - (towns[t].radius), towns[t].x + (towns[t].radius), towns[t].y + (towns[t].radius));
     floorgrid = automata(floorgrid, "tiles", towns[t].x - (towns[t].radius), towns[t].y - (towns[t].radius), towns[t].x + (towns[t].radius), towns[t].y + (towns[t].radius));
 
+}
+
+
+function enterDungeon(dungeonId, exitX, exitY) {
+    // Store where player should exit back to
+    dungeonExitPositions[dungeonId] = { x: exitX, y: exitY };
+    
+    // Create dungeon if it doesn't exist
+    if (!dungeons[dungeonId]) {
+        dungeons[dungeonId] = generateDungeon(dungeonId, 100); // Smaller dungeons
+    }
+    
+    // Change current location
+    currentLocation = { type: "dungeon", id: dungeonId };
+    
+    // Find entrance position in dungeon (look for entrance marker)
+    var entranceFound = false;
+    for (var x = 0; x < dungeons[dungeonId].length && !entranceFound; x++) {
+        for (var y = 0; y < dungeons[dungeonId][0].length && !entranceFound; y++) {
+            if (dungeons[dungeonId][x][y].image === 4) {
+                guy.x = x * 10;
+                guy.y = y * 10;
+                guy.px = guy.x;
+                guy.py = guy.y;
+                entranceFound = true;
+            }
+        }
+    }
+    
+    // Fallback to center if no entrance found
+    if (!entranceFound) {
+        guy.x = 50 * 10;
+        guy.y = 50 * 10;
+        guy.px = guy.x;
+        guy.py = guy.y;
+    }
+}
+
+function exitDungeon(dungeonId) {
+    // Return to overworld
+    currentLocation = { type: "overworld", id: 0 };
+    
+    // Restore player position
+    if (dungeonExitPositions[dungeonId]) {
+        guy.x = dungeonExitPositions[dungeonId].x;
+        guy.y = dungeonExitPositions[dungeonId].y;
+        guy.px = guy.x;
+        guy.py = guy.y;
+    }
+}
+
+function getCurrentGrid() {
+    if (currentLocation.type === "dungeon") {
+        return dungeons[currentLocation.id];
+    } else {
+        return grid;
+    }
 }
 
 
@@ -1632,8 +1793,16 @@ gun_sound.play();
         //floorgrid = automata(floorgrid, "tiles", guy_gx - 10, guy_gy - 10, guy_gx + 10, guy_gy + 10)
 
         //grid = find_pattern(grid, guy_gx - 10, guy_gy - 10, guy_gx + 10, guy_gy + 10, test_pattern, 1, 1+(lineDistance(x,y, 500, 500)/50))
-        //grid = find_pattern(grid, guy_gx - 10, guy_gy - 10, guy_gx + 10, guy_gy + 10, door_pattern, 3, 3)
-       grid = find_pattern(grid, guy_gx - 10, guy_gy - 10, guy_gx + 10, guy_gy + 10, small_pattern, 2, 1 + (lineDistance(x, y, 500, 500) / 50))
+        if (currentLocation.type === "overworld") {
+            grid = find_pattern(grid, guy_gx - 10, guy_gy - 10, guy_gx + 10, guy_gy + 10, door_pattern, 10, 0); // Use image 10 for doors, no creature spawn
+        }
+        var currentGrid = getCurrentGrid();
+        currentGrid = find_pattern(currentGrid, guy_gx - 10, guy_gy - 10, guy_gx + 10, guy_gy + 10, small_pattern, 2, 1 + (lineDistance(x, y, 500, 500) / 50))
+        if (currentLocation.type === "overworld") {
+            grid = currentGrid;
+        } else {
+            dungeons[currentLocation.id] = currentGrid;
+        }
 
     }
     //grid = gravity(grid);
@@ -1725,14 +1894,15 @@ gun_sound.play();
 
 
 
+    var currentGrid = getCurrentGrid();
     for (x = guy_gx - 25; x < guy_gx + 32; x++) {
         for (y = guy_gy - 25; y < guy_gy + 10; y++) {
-            if (x > 2 && x < grid.length - 2 && y > 2 && y < grid.length - 2) {
+            if (x > 2 && x < currentGrid.length - 2 && y > 2 && y < currentGrid.length - 2) {
 
 
 if (light.noise > 0) { ln = (rand(0, light.noise) / 100) } else { ln = 0; }
 
-                ga = light.amt - (lineDistance(x, y, guy.x / 10, guy.y / 10) / l) + grid[x][y].alphaoverride + ln ;   // rand
+                ga = light.amt - (lineDistance(x, y, guy.x / 10, guy.y / 10) / l) + currentGrid[x][y].alphaoverride + ln ;   // rand
 
 
                 if (ga < 0) {
@@ -1745,12 +1915,12 @@ if (light.noise > 0) { ln = (rand(0, light.noise) / 100) } else { ln = 0; }
 
                 ctx.globalAlpha = ga;
 
-                if (grid[x][y].alphaoverride > 0) {
-                    grid[x][y].alphaoverride = grid[x][y].alphaoverride - 0.1;
+                if (currentGrid[x][y].alphaoverride > 0) {
+                    currentGrid[x][y].alphaoverride = currentGrid[x][y].alphaoverride - 0.1;
                 }
 
-                if (grid[x][y].alphaoverride < 0) {
-                    grid[x][y].alphaoverride = 0
+                if (currentGrid[x][y].alphaoverride < 0) {
+                    currentGrid[x][y].alphaoverride = 0
                 }
 
                 p_x = x - ((guy.x + 5) / 10) + 25;
@@ -1825,120 +1995,122 @@ if (light.noise > 0) { ln = (rand(0, light.noise) / 100) } else { ln = 0; }
 
 
                 //if(floorgrid[x][y].on == 1) {
-                //ctx.drawImage(floor_g,0,grid[x][y].tileset*10,10,10,p_x*10,p_y*10,10,10);
+                //ctx.drawImage(floor_g,0,currentGrid[x][y].tileset*10,10,10,p_x*10,p_y*10,10,10);
                 //} else {
-                //ctx.drawImage(floor_g,10,grid[x][y].tileset*10,10,10,p_x*10,p_y*10,10,10);
+                //ctx.drawImage(floor_g,10,currentGrid[x][y].tileset*10,10,10,p_x*10,p_y*10,10,10);
                 //}
 
 
 
 
-                if (grid[x + 1][y] && grid[x - 1][y] && grid[x][y + 1] && grid[x][y - 1] && grid[x][y].on == 1) {
+                if (currentGrid[x + 1][y] && currentGrid[x - 1][y] && currentGrid[x][y + 1] && currentGrid[x][y - 1] && currentGrid[x][y].on == 1) {
 
 			h = 0;
-                   //  for (h = 0; h < grid[x][y].height; h = h + 2) {
-                    floorgrid[x][y].on = 1;
+                   //  for (h = 0; h < currentGrid[x][y].height; h = h + 2) {
+                    if (currentLocation.type === "overworld") {
+                        floorgrid[x][y].on = 1;
+                    }
 
 
-                    if (grid[x + 1][y].on == 1 && grid[x][y + 1].on == 1 && grid[x - 1][y - 1].on == 0 && grid[x - 1][y].on == 0 && grid[x][y - 1].on == 0) {
+                    if (currentGrid[x + 1][y].on == 1 && currentGrid[x][y + 1].on == 1 && currentGrid[x - 1][y - 1].on == 0 && currentGrid[x - 1][y].on == 0 && currentGrid[x][y - 1].on == 0) {
 
                         //ctx.putImageData(left_slope,p_x*10,p_y*10);
 
-                        ctx.drawImage(tiles, 10, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+                        ctx.drawImage(tiles, 10, currentGrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
 
-                    } else if (grid[x - 1][y].on == 1 && grid[x][y + 1].on == 1 && grid[x + 1][y - 1].on == 0 && grid[x + 1][y].on == 0 && grid[x][y - 1].on == 0) {
+                    } else if (currentGrid[x - 1][y].on == 1 && currentGrid[x][y + 1].on == 1 && currentGrid[x + 1][y - 1].on == 0 && currentGrid[x + 1][y].on == 0 && currentGrid[x][y - 1].on == 0) {
 
                         //ctx.putImageData(right_slope,p_x*10,p_y*10);
 
-                        ctx.drawImage(tiles, 20, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+                        ctx.drawImage(tiles, 20, currentGrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
 
-                    } else if (grid[x + 1][y].on == 1 && grid[x][y - 1].on == 1 && grid[x - 1][y + 1].on == 0 && grid[x - 1][y].on == 0 && grid[x][y + 1].on == 0) {
+                    } else if (currentGrid[x + 1][y].on == 1 && currentGrid[x][y - 1].on == 1 && currentGrid[x - 1][y + 1].on == 0 && currentGrid[x - 1][y].on == 0 && currentGrid[x][y + 1].on == 0) {
 
                         //ctx.putImageData(left_hang,p_x*10,p_y*10);
-                        ctx.drawImage(tiles, 40, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+                        ctx.drawImage(tiles, 40, currentGrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
 
-                            if (grid[x][y].cliff == 3) {   ctx.drawImage(cliffs_g, 0, 0, 10, 120, p_x * 10, (p_y-11) * 10, 10, 120);}
+                            if (currentGrid[x][y].cliff == 3) {   ctx.drawImage(cliffs_g, 0, 0, 10, 120, p_x * 10, (p_y-11) * 10, 10, 120);}
 
 
-                    } else if (grid[x - 1][y].on == 1 && grid[x][y - 1].on == 1 && grid[x + 1][y + 1].on == 0 && grid[x + 1][y].on == 0 && grid[x][y + 1].on == 0) {
+                    } else if (currentGrid[x - 1][y].on == 1 && currentGrid[x][y - 1].on == 1 && currentGrid[x + 1][y + 1].on == 0 && currentGrid[x + 1][y].on == 0 && currentGrid[x][y + 1].on == 0) {
 
                         //ctx.putImageData(right_hang,p_x*10,p_y*10);
-                        ctx.drawImage(tiles, 50, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+                        ctx.drawImage(tiles, 50, currentGrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
 
-                                  if (grid[x][y].cliff == 3) {   ctx.drawImage(cliffs_g, 10, 0, 10, 120, p_x * 10, (p_y-11) * 10, 10, 120);}
+                                  if (currentGrid[x][y].cliff == 3) {   ctx.drawImage(cliffs_g, 10, 0, 10, 120, p_x * 10, (p_y-11) * 10, 10, 120);}
 
 
-	         } else if( grid[x-1][y].on == 0 && grid[x+1][y].on == 0  && grid[x][y-1].on == 0 && grid[x][y+1].on == 1) { 
+	         } else if( currentGrid[x-1][y].on == 0 && currentGrid[x+1][y].on == 0  && currentGrid[x][y-1].on == 0 && currentGrid[x][y+1].on == 1) { 
 
-     			 ctx.drawImage(tiles, 70, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
-
-
-	         } else if( grid[x-1][y].on == 0 && grid[x+1][y].on == 0  && grid[x][y-1].on == 1 && grid[x][y+1].on == 0) { 
-
-     			 ctx.drawImage(tiles, 80, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
-
-  if (grid[x][y].cliff == 3) {   ctx.drawImage(cliffs_g, 30, 0, 10, 120, p_x * 10, (p_y-11) * 10, 10, 120);}
+     			 ctx.drawImage(tiles, 70, currentGrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
 
+	         } else if( currentGrid[x-1][y].on == 0 && currentGrid[x+1][y].on == 0  && currentGrid[x][y-1].on == 1 && currentGrid[x][y+1].on == 0) { 
+
+     			 ctx.drawImage(tiles, 80, currentGrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+
+  if (currentGrid[x][y].cliff == 3) {   ctx.drawImage(cliffs_g, 30, 0, 10, 120, p_x * 10, (p_y-11) * 10, 10, 120);}
 
 
-       		  } else if( grid[x-1][y].on == 0 && grid[x+1][y].on == 1  && grid[x][y-1].on == 0 && grid[x][y+1].on == 0) {
+
+
+       		  } else if( currentGrid[x-1][y].on == 0 && currentGrid[x+1][y].on == 1  && currentGrid[x][y-1].on == 0 && currentGrid[x][y+1].on == 0) {
  
-     			 ctx.drawImage(tiles, 90, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+     			 ctx.drawImage(tiles, 90, currentGrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
 
-    		 } else if( grid[x-1][y].on == 1 && grid[x+1][y].on == 0  && grid[x][y-1].on == 0 && grid[x][y+1].on == 0) { 
+    		 } else if( currentGrid[x-1][y].on == 1 && currentGrid[x+1][y].on == 0  && currentGrid[x][y-1].on == 0 && currentGrid[x][y+1].on == 0) { 
 
-     			 ctx.drawImage(tiles, 100, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+     			 ctx.drawImage(tiles, 100, currentGrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
-   		 } else if( grid[x-1][y].on == 0 && grid[x+1][y].on == 1) { 
+   		 } else if( currentGrid[x-1][y].on == 0 && currentGrid[x+1][y].on == 1) { 
 
-     			 ctx.drawImage(tiles, 110, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+     			 ctx.drawImage(tiles, 110, currentGrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 	
- 		} else if( grid[x-1][y].on == 1 && grid[x+1][y].on == 0) { 
+ 		} else if( currentGrid[x-1][y].on == 1 && currentGrid[x+1][y].on == 0) { 
 
-     			 ctx.drawImage(tiles, 120, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+     			 ctx.drawImage(tiles, 120, currentGrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
- 		} else if( grid[x-1][y].on == 0 && grid[x+1][y].on == 0  &&  grid[x][y-1].on == 1 &&  grid[x][y+1].on == 1  ) { 
+ 		} else if( currentGrid[x-1][y].on == 0 && currentGrid[x+1][y].on == 0  &&  grid[x][y-1].on == 1 &&  grid[x][y+1].on == 1  ) { 
 
-     			 ctx.drawImage(tiles, 130, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+     			 ctx.drawImage(tiles, 130, currentGrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
- 		} else if( grid[x-1][y].on == 1 && grid[x+1][y].on == 1  &&  grid[x][y-1].on == 0 &&  grid[x][y+1].on == 0  ) { 
+ 		} else if( currentGrid[x-1][y].on == 1 && currentGrid[x+1][y].on == 1  &&  grid[x][y-1].on == 0 &&  grid[x][y+1].on == 0  ) { 
 
-     			 ctx.drawImage(tiles, 140, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+     			 ctx.drawImage(tiles, 140, currentGrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
 
- 		} else if( grid[x-1][y].on == 0 && grid[x+1][y].on == 0  &&  grid[x][y-1].on == 0 &&  grid[x][y+1].on == 0  ) { 
+ 		} else if( currentGrid[x-1][y].on == 0 && currentGrid[x+1][y].on == 0  &&  grid[x][y-1].on == 0 &&  grid[x][y+1].on == 0  ) { 
 
-     			 ctx.drawImage(tiles, 150, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+     			 ctx.drawImage(tiles, 150, currentGrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
 
 
                     } else if (grid[x][y - 1].on == 0) {
 
                         //ctx.putImageData(right_hang,p_x*10,p_y*10);
-                        ctx.drawImage(tiles, 30, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+                        ctx.drawImage(tiles, 30, currentGrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
                     } else if (grid[x][y + 1].on == 0) {
 
                     
-                        ctx.drawImage(tiles, 60, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+                        ctx.drawImage(tiles, 60, currentGrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
-                           if (grid[x][y].cliff == 3) {  ctx.drawImage(cliffs_g, 20, 0, 10, 120, p_x * 10, (p_y-11) * 10, 10, 120); }
+                           if (currentGrid[x][y].cliff == 3) {  ctx.drawImage(cliffs_g, 20, 0, 10, 120, p_x * 10, (p_y-11) * 10, 10, 120); }
 
 
 
 
                     } else {
-                        if (grid[x][y].color == 0) {
-                            ctx.drawImage(tiles, 0, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+                        if (currentGrid[x][y].color == 0) {
+                            ctx.drawImage(tiles, 0, currentGrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
                         } else {
-                            ctx.drawImage(tiles, 70, grid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
+                            ctx.drawImage(tiles, 70, currentGrid[x][y].tileset * 10, 10, 10, p_x * 10, p_y * 10-h, 10, 10);
 
 
                         }
@@ -1947,22 +2119,22 @@ if (light.noise > 0) { ln = (rand(0, light.noise) / 100) } else { ln = 0; }
                     }
 
 
-                    if (grid[x][y].image > 0) {
+                    if (currentGrid[x][y].image > 0) {
                         ts = 0;
-                        if (grid[x][y].tileset > 3) {
+                        if (currentGrid[x][y].tileset > 3) {
                             ts = 50
                         }
-                        if (grid[x][y].tileset > 6) {
+                        if (currentGrid[x][y].tileset > 6) {
                             ts = 100
                         }
-                        if (grid[x][y].tileset > 8) {
+                        if (currentGrid[x][y].tileset > 8) {
                             ts = 150
                         }
 
-                        ctx.drawImage(all_scenery, grid[x][y].imagex + ((grid[x][y].image - 1) * 50), grid[x][y].imagey + ts, 10, 10, p_x * 10, p_y * 10, 10, 10);
+                        ctx.drawImage(all_scenery, currentGrid[x][y].imagex + ((grid[x][y].image - 1) * 50), currentGrid[x][y].imagey + ts, 10, 10, p_x * 10, p_y * 10, 10, 10);
 
 
-                    } else if (grid[x][y].image == -5) {
+                    } else if (currentGrid[x][y].image == -5) {
 
 			 ctx.drawImage(plant_g, (rand(1,5) - 1)*10, 0, 10, 50, p_x * 10, (p_y * 10) - 40, 10, 50);
 
@@ -2634,40 +2806,54 @@ bug_sound.play();
         }
 
 
-        if (guy.x > 2 && guy.x < (grid.length * 10) - 2 && guy.y > 2 && guy.y < (grid.length * 10) - 2) {
+        var currentGrid = getCurrentGrid();
+        if (guy.x > 2 && guy.x < (currentGrid.length * 10) - 2 && guy.y > 2 && guy.y < (currentGrid.length * 10) - 2) {
+
+
+            // Check for door/exit interaction first
+            var playerTileX = Math.round((guy.x + 5) / 10);
+            var playerTileY = Math.round((guy.y + 5) / 10);
+            
+            if (currentLocation.type === "overworld" && currentGrid[playerTileX][playerTileY].image === 10) {
+                // Player stepped on a door in overworld - enter dungeon
+                var dungeonId = Math.floor(Math.random() * 1000); // Generate unique ID for this dungeon
+                enterDungeon(dungeonId, guy.x, guy.y);
+                return; // Skip rest of collision processing
+            } else if (currentLocation.type === "dungeon" && currentGrid[playerTileX][playerTileY].image === 5) {
+                // Player stepped on exit in dungeon - return to overworld
+                exitDungeon(currentLocation.id);
+                return; // Skip rest of collision processing
+            }
+
+            currentGrid[playerTileX][playerTileY].alphaoverride = .4;
+            if (playerTileX > 0) currentGrid[playerTileX - 1][playerTileY].alphaoverride = 0.3;
+            if (playerTileX < currentGrid.length - 1) currentGrid[playerTileX + 1][playerTileY].alphaoverride = 0.3;
+            if (playerTileY > 0) currentGrid[playerTileX][playerTileY - 1].alphaoverride = 0.3;
+            if (playerTileY < currentGrid[0].length - 1) currentGrid[playerTileX][playerTileY + 1].alphaoverride = 0.3;
 
 
 
 
-            grid[Math.round((guy.x + 5) / 10)][Math.round((guy.y + 5) / 10)].alphaoverride = .4;
-            grid[Math.round((guy.x + 5) / 10) - 1][Math.round((guy.y + 5) / 10)].alphaoverride = 0.3;
-            grid[Math.round((guy.x + 5) / 10) + 1][Math.round((guy.y + 5) / 10)].alphaoverride = 0.3;
-            grid[Math.round((guy.x + 5) / 10)][Math.round((guy.y + 5) / 10) - 1].alphaoverride = 0.3;
-            grid[Math.round((guy.x + 5) / 10)][Math.round((guy.y + 5) / 10) + 1].alphaoverride = 0.3;
-
-
-
-
-            if (grid[Math.round((guy.x + 5) / 10)][Math.round((guy.y + 5) / 10)].on == 1) {
+            if (currentGrid[playerTileX][playerTileY].on == 1) {
 
 
                 //alert(Math.round(guy.x/10) + " " + Math.round(guy.px/10) );
-                //grid[Math.round((guy.x + 5)/10)][Math.round((guy.y + 5)/10)].color = 1;
+                //currentGrid[Math.round((guy.x + 5)/10)][Math.round((guy.y + 5)/10)].color = 1;
 
-                grid[Math.round((guy.x + 5) / 10)][Math.round((guy.y + 5) / 10)].f++;
+                currentGrid[playerTileX][playerTileY].f++;
                 new_explosion(guy.x, guy.y, 2, 40);
                 //if (guy.xvel < -2 || guy.xvel > 2) {
                 score = score + 100;
-                grid[Math.round((guy.x + 5) / 10)][Math.round((guy.y + 5) / 10)].on = 0;
-                grid[Math.round((guy.x + 5) / 10) - 1][Math.round((guy.y + 5) / 10)].on = 0;
-                grid[Math.round((guy.x + 5) / 10) + 1][Math.round((guy.y + 5) / 10)].on = 0;
-                grid[Math.round((guy.x + 5) / 10)][Math.round((guy.y + 5) / 10) - 1].on = 0;
-                grid[Math.round((guy.x + 5) / 10)][Math.round((guy.y + 5) / 10) + 1].on = 0;
+                currentGrid[playerTileX][playerTileY].on = 0;
+                if (playerTileX > 0) currentGrid[playerTileX - 1][playerTileY].on = 0;
+                if (playerTileX < currentGrid.length - 1) currentGrid[playerTileX + 1][playerTileY].on = 0;
+                if (playerTileY > 0) currentGrid[playerTileX][playerTileY - 1].on = 0;
+                if (playerTileY < currentGrid[0].length - 1) currentGrid[playerTileX][playerTileY + 1].on = 0;
 
-                grid[Math.round((guy.x + 5) / 10) - 1][Math.round((guy.y + 5) / 10) - 1].on = 0;
-                grid[Math.round((guy.x + 5) / 10) + 1][Math.round((guy.y + 5) / 10) + 1].on = 0;
-                grid[Math.round((guy.x + 5) / 10) + 1][Math.round((guy.y + 5) / 10) - 1].on = 0;
-                grid[Math.round((guy.x + 5) / 10) - 1][Math.round((guy.y + 5) / 10) + 1].on = 0;
+                if (playerTileX > 0 && playerTileY > 0) currentGrid[playerTileX - 1][playerTileY - 1].on = 0;
+                if (playerTileX < currentGrid.length - 1 && playerTileY < currentGrid[0].length - 1) currentGrid[playerTileX + 1][playerTileY + 1].on = 0;
+                if (playerTileX < currentGrid.length - 1 && playerTileY > 0) currentGrid[playerTileX + 1][playerTileY - 1].on = 0;
+                if (playerTileX > 0 && playerTileY < currentGrid[0].length - 1) currentGrid[playerTileX - 1][playerTileY + 1].on = 0;
 
                 new_particles(guy.x, guy.y, 20, 1, "green", 5)
                     // }
@@ -2683,14 +2869,19 @@ bug_sound.play();
 
 
             }
+            
+            // Update the current grid back if we're in a dungeon
+            if (currentLocation.type === "dungeon") {
+                dungeons[currentLocation.id] = currentGrid;
+            }
 pkup = new Object();
 pkup.on = 0
 
-           if (grid[Math.round((guy.x + 5) / 10)][Math.round((guy.y + 5) / 10)].pickup > 0) {
+           if (currentGrid[Math.round((guy.x + 5) / 10)][Math.round((guy.y + 5) / 10)].pickup > 0) {
 pkup.x = Math.round((guy.x + 5) / 10);
 pkup.y = Math.round((guy.y + 5) / 10);
 pkup.on = 1;
-pkup.pkup = grid[Math.round((guy.x + 5) / 10)][Math.round((guy.y + 5) / 10)].pickup;
+pkup.pkup = currentGrid[Math.round((guy.x + 5) / 10)][Math.round((guy.y + 5) / 10)].pickup;
 
 
 
